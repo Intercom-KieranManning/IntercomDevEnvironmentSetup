@@ -1,0 +1,73 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ${DB_NAME:-devdb}
+      POSTGRES_USER: ${DB_USER:-devuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-devpass}
+    ports:
+      - "5432:5432"          # optional: expose for external DB tools
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-devuser}"]
+      interval: 5s
+      timeout: 3s
+
+  backend:
+    build: ./backend
+    dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app          # live code reload
+    environment:
+      - DEBUG=1
+      - DB_NAME=${DB_NAME:-devdb}
+      - DB_USER=${DB_USER:-devuser}
+      - DB_PASSWORD=${DB_PASSWORD:-devpass}
+      - DB_HOST=db
+      - DB_PORT=5432
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python manage.py runserver 0.0.0.0:8000
+
+  frontend:
+    build: ./frontend
+    dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"           # Vite / CRA default
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules     # avoid overwriting container's node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000   # if using Vite proxy, or use backend container name
+    # For React + CRA you might add a proxy in package.json: "proxy": "http://backend:8000"
+
+  client1:
+    build: ./client
+    dockerfile: Dockerfile.dev
+    volumes:
+      - ./client:/app
+    environment:
+      - API_BASE_URL=http://backend:8000
+      - CLIENT_ID=1
+    depends_on:
+      - backend
+    # If the client is a one‑shot script, override command: ["python", "client.py"]
+    # If it's a long‑running service, keep as is.
+
+  # client2 – if you need a second instance with different config
+  client2:
+    build: ./client
+    volumes:
+      - ./client:/app
+    environment:
+      - API_BASE_URL=http://backend:8000
+      - CLIENT_ID=2
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
