@@ -1,73 +1,83 @@
+networks:
+  transparenc:
+    driver: bridge
+
+volumes:
+  pgdata:
+
+
 services:
-  db:
+  postgres_db:
     image: postgres:15
     environment:
-      POSTGRES_DB: ${DB_NAME:-devdb}
-      POSTGRES_USER: ${DB_USER:-devuser}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-devpass}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"          # optional: expose for external DB tools
+      - "5432:5432"         
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - transparenc
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-devuser}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 5s
       timeout: 3s
 
   backend:
-    build: ./backend
-    dockerfile: Dockerfile.dev
+    build:
+      context: ./APIServer
+      dockerfile: Dockerfile.dev
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app          # live code reload
+      - ./APIServer:/app         
     environment:
       - DEBUG=1
-      - DB_NAME=${DB_NAME:-devdb}
-      - DB_USER=${DB_USER:-devuser}
-      - DB_PASSWORD=${DB_PASSWORD:-devpass}
-      - DB_HOST=db
-      - DB_PORT=5432
+      - POSTGRES_HOST=postgres_db
+    env_file:
+      - .env
     depends_on:
-      db:
+      postgres_db:
         condition: service_healthy
-    command: python manage.py runserver 0.0.0.0:8000
+    networks:
+      - transparenc
+    healthcheck:
+      test: ["CMD-SHELL", "wget", "http://localhost:8000/health/"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    command: uv run python manage.py runserver 0.0.0.0:8000
 
   frontend:
-    build: ./frontend
-    dockerfile: Dockerfile.dev
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile.dev
     ports:
-      - "3000:3000"           # Vite / CRA default
+      - "8080:8080"
     volumes:
-      - ./frontend:/app
+      - ./Frontend:/app
       - /app/node_modules     # avoid overwriting container's node_modules
-    environment:
-      - VITE_API_URL=http://localhost:8000   # if using Vite proxy, or use backend container name
-    # For React + CRA you might add a proxy in package.json: "proxy": "http://backend:8000"
+    # depends_on:
+    #   backend:
+    #     condition: service_healthy      
+    env_file:
+      - .env
+    networks:
+      - transparenc
 
-  client1:
-    build: ./client
-    dockerfile: Dockerfile.dev
-    volumes:
-      - ./client:/app
-    environment:
-      - API_BASE_URL=http://backend:8000
-      - CLIENT_ID=1
-    depends_on:
-      - backend
-    # If the client is a one‑shot script, override command: ["python", "client.py"]
-    # If it's a long‑running service, keep as is.
-
-  # client2 – if you need a second instance with different config
-  client2:
-    build: ./client
-    volumes:
-      - ./client:/app
-    environment:
-      - API_BASE_URL=http://backend:8000
-      - CLIENT_ID=2
-    depends_on:
-      - backend
-
-volumes:
-  pgdata:
+  # client1:
+  #   build:
+  #     context: ./client
+  #     dockerfile: Dockerfile.dev
+  #   volumes:
+  #     - ./client:/app
+  #   environment:
+  #     - API_BASE_URL=http://backend:8000
+  #     - CLIENT_ID=1
+  #   depends_on:
+  #     - backend
+  #   networks:
+  # -transparenc
+  #   # If the client is a one‑shot script, override command: ["python", "client.py"]
+  #   # If it's a long‑running service, keep as is.
