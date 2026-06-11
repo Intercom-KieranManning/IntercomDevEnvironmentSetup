@@ -14,7 +14,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"         
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
@@ -23,6 +23,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 5s
       timeout: 3s
+      retries: 10
 
   backend:
     build:
@@ -31,10 +32,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./APIServer:/app         
-    environment:
-      - DEBUG=1
-      - POSTGRES_HOST=postgres_db
+      - ./APIServer:/app
     env_file:
       - .env
     depends_on:
@@ -43,11 +41,11 @@ services:
     networks:
       - transparenc
     healthcheck:
-      test: ["CMD-SHELL", "wget", "http://0.0.0.0:8000/api/v1/health/"]
-      interval: 5s
+      test: ["CMD-SHELL", "wget -qO- http://0.0.0.0:8000/api/v1/health/ || exit 1"]
+      interval: 10s
       timeout: 5s
       retries: 10
-    command: uv run python manage.py runserver 0.0.0.0:8000
+    command: bash -c "uv run python manage.py migrate && uv run python manage.py createsuperuser --noinput 2>/dev/null; uv run python manage.py runserver 0.0.0.0:8000"
 
   frontend:
     build:
@@ -57,27 +55,27 @@ services:
       - "8080:8080"
     volumes:
       - ./Frontend:/app
-      - /app/node_modules     # avoid overwriting container's node_modules
-    # depends_on:
-    #   backend:
-    #     condition: service_healthy      
-    env_file:
-      - .env
+      - /app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
     networks:
       - transparenc
 
-  # client1:
-  #   build:
-  #     context: ./client
-  #     dockerfile: Dockerfile.dev
-  #   volumes:
-  #     - ./client:/app
-  #   environment:
-  #     - API_BASE_URL=http://backend:8000
-  #     - CLIENT_ID=1
-  #   depends_on:
-  #     - backend
-  #   networks:
-  # -transparenc
-  #   # If the client is a one‑shot script, override command: ["python", "client.py"]
-  #   # If it's a long‑running service, keep as is.
+  clientpython:
+    build:
+      context: ./ClientPython
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./ClientPython:/app
+    environment:
+      - HTTP_API_BASE_URL=http://backend:8000
+      - WEBSOCKET_API_BASE_URL=ws://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - transparenc
+    profiles:
+      - client
+    command: uv run python main.py
