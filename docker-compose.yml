@@ -4,6 +4,8 @@ networks:
 
 volumes:
   pgdata:
+  client_tokens:
+  device_oauth_config:
 
 
 services:
@@ -33,6 +35,7 @@ services:
       - "8000:8000"
     volumes:
       - ./APIServer:/app
+      - device_oauth_config:/root/.config/intercom-api
     env_file:
       - .env
     depends_on:
@@ -45,7 +48,24 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    command: bash -c "uv run python manage.py migrate && uv run python manage.py createsuperuser --noinput 2>/dev/null; uv run python manage.py runserver 0.0.0.0:8000"
+    command: sh -c "uv run python manage.py migrate && uv run python manage.py createsuperuser --noinput 2>/dev/null; uv run python manage.py runserver 0.0.0.0:8000"
+
+  device_autoapprove:
+    build:
+      context: ./APIServer
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./APIServer:/app
+    env_file:
+      - .env
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - transparenc
+    profiles:
+      - client
+    command: uv run python manage.py auto_approve_devices --user ${DJANGO_SUPERUSER_EMAIL}
 
   frontend:
     build:
@@ -68,12 +88,17 @@ services:
       dockerfile: Dockerfile.dev
     volumes:
       - ./ClientPython:/app
+      - device_oauth_config:/root/.config/intercom-api
+      - client_tokens:/root/.config/intercomclient
+    env_file:
+      - .env
     environment:
       - HTTP_API_BASE_URL=http://backend:8000
       - WEBSOCKET_API_BASE_URL=ws://backend:8000
+      - TOKEN_FILE_PATH=/root/.config/intercomclient/tokens.json
     depends_on:
-      backend:
-        condition: service_healthy
+      device_autoapprove:
+        condition: service_started
     networks:
       - transparenc
     profiles:
