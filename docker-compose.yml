@@ -36,6 +36,7 @@ services:
     volumes:
       - ./APIServer:/app
       - device_oauth_config:/root/.config/intercom-api
+      - client_tokens:/root/.config/intercomclient
     env_file:
       - .env
     depends_on:
@@ -48,7 +49,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    command: sh -c "uv run python manage.py migrate && uv run python manage.py createsuperuser --noinput 2>/dev/null; uv run python manage.py runserver 0.0.0.0:8000"
+    command: sh /app/start.sh
 
   device_autoapprove:
     build:
@@ -65,7 +66,7 @@ services:
       - transparenc
     profiles:
       - client
-    command: uv run python manage.py auto_approve_devices --user ${DJANGO_SUPERUSER_EMAIL}
+    command: uv run python manage.py auto_approve_devices --user ${DJANGO_LOCAL_DEV_USER}
 
   frontend:
     build:
