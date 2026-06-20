@@ -100,11 +100,6 @@ jobs:
     needs: [build-and-push, tag]
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
       - name: Log in to private Docker registry
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login docker.kmanning.ie:5000 -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
@@ -117,12 +112,13 @@ jobs:
       - name: Write production .env
         run: echo "${{ secrets.DOT_ENV_REMOTE }}" > /opt/transparenc/.env
 
-      - name: Copy compose files to server
+      - name: Update compose files
         run: |
-          cp docker-compose.yml /opt/transparenc/docker-compose.yml
-          cp infra/docker-compose.prod.yml /opt/transparenc/docker-compose.prod.yml
+          cd /opt/transparenc
+          git fetch origin master
+          git checkout origin/master -- docker-compose.yml infra/docker-compose.prod.yml
 
       - name: Start services
         run: |
           cd /opt/transparenc
-          docker compose -f docker-compose.yml -f infra/docker-compose.prod.yml up -d
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
