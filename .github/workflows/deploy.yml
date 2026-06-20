@@ -62,6 +62,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-tags: true
+          submodules: recursive
 
       - name: Log in to private Docker registry
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login docker.kmanning.ie:5000 -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
@@ -101,6 +102,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Log in to private Docker registry
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login docker.kmanning.ie:5000 -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
@@ -114,7 +117,12 @@ jobs:
       - name: Write production .env
         run: echo "${{ secrets.DOT_ENV_REMOTE }}" > /opt/transparenc/.env
 
+      - name: Copy compose files to server
+        run: |
+          cp docker-compose.yml /opt/transparenc/docker-compose.yml
+          cp infra/docker-compose.prod.yml /opt/transparenc/docker-compose.prod.yml
+
       - name: Start services
         run: |
           cd /opt/transparenc
-          IMAGE_TAG=${{ needs.tag.outputs.new_tag }} docker compose -f docker-compose.yml -f infra/docker-compose.prod.yml up -d
+          docker compose -f docker-compose.yml -f infra/docker-compose.prod.yml up -d

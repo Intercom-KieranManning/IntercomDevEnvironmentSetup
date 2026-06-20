@@ -1,12 +1,12 @@
 # Production Docker Compose — Intercom
-# Usage (on remote server, from repo root):
-#   docker compose -f docker-compose.yml -f infra/docker-compose.prod.yml up -d
+# Usage (on remote server, from /opt/transparenc):
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
 # Overrides for production:
-#   - backend:  production Dockerfile (multi-stage, no dev deps)
-#   - frontend: production Dockerfile (Node build → Nginx serve)
-#   - utility:  removed (dev-only init container)
-#   - clientpython: removed (runs on device, not on server)
+#   - backend:  pulls pre-built image from registry (built in CI)
+#   - frontend: pulls pre-built image from registry (built in CI)
+#   - utility:  disabled (dev-only init container)
+#   - clientpython: disabled (runs on device, not on server)
 #   - postgres_db: uses named volume, restart policy
 
 networks:
@@ -23,8 +23,9 @@ services:
       - pgdata:/var/lib/postgresql/data
 
   backend:
+    image: docker.kmanning.ie:5000/intercom-api:${IMAGE_TAG:-latest}
     build:
-      context: ./APIServer
+      context: ../APIServer
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
@@ -41,8 +42,9 @@ services:
       retries: 5
 
   frontend:
+    image: docker.kmanning.ie:5000/intercom-dashboard:${IMAGE_TAG:-latest}
     build:
-      context: ./Frontend
+      context: ../Frontend
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
@@ -53,9 +55,6 @@ services:
     volumes: []
 
   # Dev-only services — explicitly disabled for production.
-  # Overrides the base service with no ports, no mounts, and a no-op
-  # command so docker compose considers them "defined" but they do
-  # nothing and consume no ports.
   utility:
     profiles: ["never"]
     entrypoint: ["true"]
