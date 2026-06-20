@@ -66,8 +66,8 @@ jobs:
 
       - name: Clone source repositories
         run: |
-          git clone --depth 1 git@github.com:kieranmanning/IntercomAPIServer.git APIServer
-          git clone --depth 1 git@github.com:Intercom-KieranManning/IntercomFrontend.git Frontend
+          git clone --depth 1 https://x-access-token:${{ secrets.PAT_WRITE_REPO }}@github.com/kieranmanning/IntercomAPIServer.git APIServer
+          git clone --depth 1 https://x-access-token:${{ secrets.PAT_WRITE_REPO }}@github.com/Intercom-KieranManning/IntercomFrontend.git Frontend
 
       - name: Log in to private Docker registry
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login docker.kmanning.ie:5000 -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
