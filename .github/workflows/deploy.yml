@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.PAT_REPO_WRITE }}
+          token: ${{ secrets.PAT_WRITE_REPO }}
           persist-credentials: true
 
       - name: Compute next semver tag
