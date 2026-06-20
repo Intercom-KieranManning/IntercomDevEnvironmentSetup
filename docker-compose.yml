@@ -4,9 +4,6 @@ networks:
 
 volumes:
   pgdata:
-  client_tokens:
-  device_oauth_config:
-
 
 services:
   postgres_db:
@@ -28,15 +25,9 @@ services:
       retries: 10
 
   backend:
-    build:
-      context: ./APIServer
-      dockerfile: Dockerfile.dev
+    image: docker.kmanning.ie:5000/intercom-api:latest
     ports:
       - "8000:8000"
-    volumes:
-      - ./APIServer:/app
-      - device_oauth_config:/root/.config/intercom-api
-      - client_tokens:/root/.config/intercomclient
     env_file:
       - .env
     environment:
@@ -52,67 +43,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    command: ["uv", "run", "daphne", "-b", "0.0.0.0", "-p", "8000", "IntercomAPIServer.asgi:application"]
-
-  utility:
-    build:
-      context: ./APIServer
-      dockerfile: Dockerfile.dev
-    volumes:
-      - ./APIServer:/app
-      - device_oauth_config:/root/.config/intercom-api
-      - client_tokens:/root/.config/intercomclient
-    env_file:
-      - .env
-    environment:
-      - AWS_ACCESS_KEY_ID=${aws_access_key_id}
-      - AWS_SECRET_ACCESS_KEY=${aws_secret_access_key}
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - transparenc
-    healthcheck:
-      test: ["CMD", "test", "-f", "/tmp/utility-ready"]
-      interval: 5s
-      timeout: 3s
-      retries: 60
-    command: sh /app/utility.sh
 
   frontend:
-    build:
-      context: ./Frontend
-      dockerfile: Dockerfile.dev
+    image: docker.kmanning.ie:5000/intercom-dashboard:latest
     ports:
-      - "8080:8080"
-    volumes:
-      - ./Frontend:/app
-      - /app/node_modules
+      - "8080:80"
     depends_on:
       backend:
         condition: service_healthy
     networks:
       - transparenc
-
-  clientpython:
-    build:
-      context: ./ClientPython
-      dockerfile: Dockerfile.dev
-    volumes:
-      - ./ClientPython:/app
-      - device_oauth_config:/root/.config/intercom-api
-      - client_tokens:/root/.config/intercomclient
-    env_file:
-      - .env
-    environment:
-      - HTTP_API_BASE_URL=http://backend:8000
-      - WEBSOCKET_API_BASE_URL=ws://backend:8000
-      - TOKEN_FILE_PATH=/root/.config/intercomclient/tokens.json
-    depends_on:
-      utility:
-        condition: service_healthy
-    networks:
-      - transparenc
-    devices:
-      - /dev/video0:/dev/video0
-    command: uv run python main.py

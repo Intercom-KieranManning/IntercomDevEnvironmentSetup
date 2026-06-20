@@ -2,12 +2,8 @@
 # Usage (on remote server, from /opt/transparenc):
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
-# Overrides for production:
-#   - backend:  pulls pre-built image from registry (built in CI)
-#   - frontend: pulls pre-built image from registry (built in CI)
-#   - utility:  disabled (dev-only init container)
-#   - clientpython: disabled (runs on device, not on server)
-#   - postgres_db: uses named volume, restart policy
+# Images are built and pushed by each repo's own CI pipeline.
+# This file only pulls pre-built :latest images from the registry.
 
 networks:
   transparenc:
@@ -23,10 +19,7 @@ services:
       - pgdata:/var/lib/postgresql/data
 
   backend:
-    image: docker.kmanning.ie:5000/intercom-api:${IMAGE_TAG:-latest}
-    build:
-      context: ../APIServer
-      dockerfile: Dockerfile
+    image: docker.kmanning.ie:5000/intercom-api:latest
     restart: unless-stopped
     ports:
       - "8000:8000"
@@ -42,10 +35,7 @@ services:
       retries: 5
 
   frontend:
-    image: docker.kmanning.ie:5000/intercom-dashboard:${IMAGE_TAG:-latest}
-    build:
-      context: ../Frontend
-      dockerfile: Dockerfile
+    image: docker.kmanning.ie:5000/intercom-dashboard:latest
     restart: unless-stopped
     ports:
       - "8080:80"
@@ -53,16 +43,3 @@ services:
       backend:
         condition: service_healthy
     volumes: []
-
-  # Dev-only services — explicitly disabled for production.
-  utility:
-    profiles: ["never"]
-    entrypoint: ["true"]
-    command: []
-    scale: 0
-
-  clientpython:
-    profiles: ["never"]
-    entrypoint: ["true"]
-    command: []
-    scale: 0
