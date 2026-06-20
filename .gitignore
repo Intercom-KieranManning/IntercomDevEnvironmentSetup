@@ -1,0 +1,10 @@
+# Environment / secrets
+.env
+secrets.json
+
+# Editor
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo

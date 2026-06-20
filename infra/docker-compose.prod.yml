@@ -1,0 +1,69 @@
+# Production Docker Compose — Intercom
+# Usage (on remote server, from repo root):
+#   docker compose -f docker-compose.yml -f infra/docker-compose.prod.yml up -d
+#
+# Overrides for production:
+#   - backend:  production Dockerfile (multi-stage, no dev deps)
+#   - frontend: production Dockerfile (Node build → Nginx serve)
+#   - utility:  removed (dev-only init container)
+#   - clientpython: removed (runs on device, not on server)
+#   - postgres_db: uses named volume, restart policy
+
+networks:
+  transparenc:
+    driver: bridge
+
+volumes:
+  pgdata:
+
+services:
+  postgres_db:
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./APIServer
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes: []
+    environment:
+      - AWS_ACCESS_KEY_ID=${aws_access_key_id}
+      - AWS_SECRET_ACCESS_KEY=${aws_secret_access_key}
+      - DJANGO_DEBUG=false
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://0.0.0.0:8000/api/v1/health/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes: []
+
+  # Dev-only services — explicitly disabled for production.
+  # Overrides the base service with no ports, no mounts, and a no-op
+  # command so docker compose considers them "defined" but they do
+  # nothing and consume no ports.
+  utility:
+    profiles: ["never"]
+    entrypoint: ["true"]
+    command: []
+    scale: 0
+
+  clientpython:
+    profiles: ["never"]
+    entrypoint: ["true"]
+    command: []
+    scale: 0

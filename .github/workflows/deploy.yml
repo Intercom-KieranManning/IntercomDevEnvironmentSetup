@@ -1,0 +1,120 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - master
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-22.04-arm
+    outputs:
+      new_tag: ${{ steps.bump.outputs.new_tag }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PAT_REPO_WRITE }}
+          persist-credentials: true
+
+      - name: Compute next semver tag
+        id: bump
+        run: |
+          latest=$(git tag -l 'v*' --sort=-v:refname | head -1)
+
+          if [ -z "$latest" ]; then
+            ver="0.0.0"
+          else
+            ver="${latest#v}"
+          fi
+
+          IFS='.' read -r major minor patch <<< "$ver"
+
+          commit_msg=$(git log -1 --pretty=%B)
+
+          if echo "$commit_msg" | grep -qiE '#major|BREAKING CHANGE'; then
+            major=$((major + 1)); minor=0; patch=0
+          elif echo "$commit_msg" | grep -qiE '#minor|^feat(\(.+\))?!?:'; then
+            minor=$((minor + 1)); patch=0
+          else
+            patch=$((patch + 1))
+          fi
+
+          new_tag="v${major}.${minor}.${patch}"
+          echo "Bumping: ${latest:-<none>} -> ${new_tag}"
+          echo "new_tag=${new_tag}" >> "$GITHUB_OUTPUT"
+
+          git tag "$new_tag"
+          git push origin "$new_tag"
+
+  build-and-push:
+    runs-on: ubuntu-22.04-arm
+    needs: tag
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+
+      - name: Log in to private Docker registry
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login docker.kmanning.ie:5000 -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build and push backend image
+        run: |
+          IMAGE=docker.kmanning.ie:5000/intercom-api
+          TAG=${{ needs.tag.outputs.new_tag }}
+          docker build \
+            -f APIServer/Dockerfile \
+            -t "$IMAGE:latest" \
+            -t "$IMAGE:${{ github.sha }}" \
+            -t "$IMAGE:$TAG" \
+            .
+          docker push "$IMAGE:latest"
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:$TAG"
+
+      - name: Build and push frontend image
+        run: |
+          IMAGE=docker.kmanning.ie:5000/intercom-dashboard
+          TAG=${{ needs.tag.outputs.new_tag }}
+          docker build \
+            -f Frontend/Dockerfile \
+            -t "$IMAGE:latest" \
+            -t "$IMAGE:${{ github.sha }}" \
+            -t "$IMAGE:$TAG" \
+            .
+          docker push "$IMAGE:latest"
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:$TAG"
+
+  deploy:
+    runs-on: [self-hosted, righteous]
+    needs: [build-and-push, tag]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to private Docker registry
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login docker.kmanning.ie:5000 -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Pull latest images
+        run: |
+          TAG=${{ needs.tag.outputs.new_tag }}
+          docker pull "docker.kmanning.ie:5000/intercom-api:$TAG"
+          docker pull "docker.kmanning.ie:5000/intercom-dashboard:$TAG"
+
+      - name: Write production .env
+        run: echo "${{ secrets.DOT_ENV_REMOTE }}" > /opt/transparenc/.env
+
+      - name: Start services
+        run: |
+          cd /opt/transparenc
+          IMAGE_TAG=${{ needs.tag.outputs.new_tag }} docker compose -f docker-compose.yml -f infra/docker-compose.prod.yml up -d
