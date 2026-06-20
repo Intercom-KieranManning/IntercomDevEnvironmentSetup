@@ -39,6 +39,9 @@ services:
       - client_tokens:/root/.config/intercomclient
     env_file:
       - .env
+    environment:
+      - AWS_ACCESS_KEY_ID=${aws_access_key_id}
+      - AWS_SECRET_ACCESS_KEY=${aws_secret_access_key}
     depends_on:
       postgres_db:
         condition: service_healthy
@@ -61,12 +64,19 @@ services:
       - client_tokens:/root/.config/intercomclient
     env_file:
       - .env
+    environment:
+      - AWS_ACCESS_KEY_ID=${aws_access_key_id}
+      - AWS_SECRET_ACCESS_KEY=${aws_secret_access_key}
     depends_on:
       backend:
         condition: service_healthy
     networks:
       - transparenc
-    restart: "no"
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/utility-ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
     command: sh /app/utility.sh
 
   frontend:
@@ -100,7 +110,9 @@ services:
       - TOKEN_FILE_PATH=/root/.config/intercomclient/tokens.json
     depends_on:
       utility:
-        condition: service_completed_successfully
+        condition: service_healthy
     networks:
       - transparenc
+    devices:
+      - /dev/video0:/dev/video0
     command: uv run python main.py
