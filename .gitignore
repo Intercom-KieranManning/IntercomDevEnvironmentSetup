@@ -8,3 +8,20 @@ secrets.json
 .idea/
 *.swp
 *.swo
+
+# Cloned source repos (managed by setup.sh, not tracked here)
+APIServer/
+ClientPython/
+Frontend/
+iOSApp/
+ReactNativeClients/
+SwiftClient/
+
+# Local Python
+.venv/
+__pycache__/
+*.pyc
+
+# Local Node
+node_modules/
+dist/

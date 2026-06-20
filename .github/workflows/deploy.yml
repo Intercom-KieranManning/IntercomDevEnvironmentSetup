@@ -58,11 +58,16 @@ jobs:
     needs: tag
 
     steps:
-      - name: Checkout repository
+      - name: Checkout orchestration repo
         uses: actions/checkout@v4
         with:
           fetch-tags: true
-          submodules: recursive
+          path: deploy
+
+      - name: Clone source repositories
+        run: |
+          git clone --depth 1 git@github.com:kieranmanning/IntercomAPIServer.git APIServer
+          git clone --depth 1 git@github.com:Intercom-KieranManning/IntercomFrontend.git Frontend
 
       - name: Log in to private Docker registry
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login docker.kmanning.ie:5000 -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
