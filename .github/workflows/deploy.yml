@@ -21,6 +21,7 @@ jobs:
         run: |
           docker pull docker.kmanning.ie:5000/intercom-api:latest
           docker pull docker.kmanning.ie:5000/intercom-dashboard:latest
+          docker pull docker.kmanning.ie:5000/intercom-python-client:latest
 
       - name: Write production .env
         run: echo "${{ secrets.DOT_ENV_REMOTE }}" > /opt/transparenc/.env
@@ -34,4 +35,4 @@ jobs:
       - name: Start services
         run: |
           cd /opt/transparenc
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+          docker compose -f docker-compose.yml -f infra/docker-compose.prod.yml up -d

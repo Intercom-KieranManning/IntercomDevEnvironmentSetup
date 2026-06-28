@@ -25,7 +25,9 @@ services:
       retries: 10
 
   backend:
-    image: docker.kmanning.ie:5000/intercom-api:latest
+    build:
+      context: ./APIServer
+      dockerfile: Dockerfile.dev
     ports:
       - "8000:8000"
     env_file:
@@ -45,7 +47,9 @@ services:
       retries: 10
 
   frontend:
-    image: docker.kmanning.ie:5000/intercom-dashboard:latest
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile.dev
     ports:
       - "8080:80"
     depends_on:
