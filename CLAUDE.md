@@ -9,8 +9,8 @@ Intercom/
 ├── APIServer/                   # Django REST API backend
 │   ├── IntercomAPIServer/       # Settings, root URLs, ASGI/WSGI
 │   ├── accounts/                # Custom User model (email-based), session endpoints
-│   ├── authentication/          # Cognito OAuth, JWT middleware, device grant views
-│   ├── client_devices/          # Device registration & OAuth device flow (RFC 8628)
+│   ├── authentication/          # Cognito OAuth, JWT + OAuth2 middleware, device grant views
+│   ├── client_devices/          # Device registration, OAuth device flow, telemetry
 │   ├── invites/                 # Invite code system (PENDING/ACCEPTED/REVOKED)
 │   ├── live_stream/             # WebSocket consumers for device signaling
 │   ├── api/                     # API versioning (v1) & OpenAPI schema
@@ -18,7 +18,7 @@ Intercom/
 │   ├── pyproject.toml           # uv dependencies
 │   ├── Dockerfile.dev           # Dev image (uv + Alpine)
 │   ├── utility.sh               # Init script (migrations, superuser, device registration)
-│   └── start.sh                 # Legacy startup script
+│   └── start.sh                 # Startup script (runs migrations then starts Daphne)
 ├── Frontend/                    # Vite + React SPA
 │   ├── src/
 │   │   ├── main.tsx             # Entry point, routing, session auth gate
@@ -30,7 +30,7 @@ Intercom/
 │   └── vite.config.ts           # Dev server + proxy config
 ├── ClientPython/                # Python device client (camera + WebRTC)
 │   ├── main.py                  # PiClient entry point
-│   ├── intercomclient/          # Config, auth, camera, token store
+│   ├── intercomclient/          # Config, auth, camera, token store, telemetry
 │   ├── pyproject.toml           # uv dependencies (aiortc, opencv, websockets)
 │   └── Dockerfile.dev           # Dev image (uv + bookworm-slim + OpenCV deps)
 ├── docker-compose.yml           # Root orchestration (all services)
@@ -58,7 +58,7 @@ Intercom/
 |---|---|---|
 | `postgres_db` | PostgreSQL 15 database | — |
 | `backend` | Django API via Daphne (port 8000) | `postgres_db` (healthy) |
-| `utility` | Init: migrations, superuser, Cognito user, device registration. Runs indefinitely after init. | `backend` (healthy) |
+| `utility` | Init: migrations, superuser, Cognito user, device registration. Stays up after init. | `backend` (healthy) |
 | `frontend` | React dev server via Vite (port 8080) | `backend` (healthy) |
 | `clientpython` | Device client (camera + WebRTC signaling) | `utility` (healthy) |
 
@@ -113,10 +113,10 @@ docker compose down -v && docker compose up -d
 
 ### Two-tier auth:
 1. **Session-based (browser SPA):** Django session cookies. Public routes are whitelisted in `JwtBearerAuthenticationMiddleware`.
-2. **JWT Bearer Tokens (devices):** OAuth2 device flow tokens validated via `django-oauth-toolkit`. DRF uses `OAuth2Authentication`.
+2. **Bearer Tokens (devices):** OAuth2 device flow tokens issued by `django-oauth-toolkit`. The HTTP middleware validates these as a fallback after Cognito JWT validation; DRF uses `OAuth2Authentication` to resolve `request.user`.
 
 ### WebSocket Auth:
-- **Device clients:** Bearer token in `Authorization` header, validated against `oauth2_provider.AccessToken`
+- **Device clients:** OAuth2 Bearer token in `Authorization` header, validated against `oauth2_provider.AccessToken`
 - **Browser viewers:** Session cookie via `AuthMiddlewareStack`
 
 ### OAuth2 Device Flow (RFC 8628):
@@ -134,6 +134,7 @@ docker compose down -v && docker compose up -d
 5. Device captures camera frames via OpenCV → adds track → sends SDP answer
 6. ICE candidates exchanged bidirectionally via signaling server
 7. Video stream flows device → peer connection → viewer `<video>` element
+8. On viewer disconnect, device resets RTCPeerConnection (keeps signaling WS open) ready for the next viewer
 
 ## Key API Endpoints
 
@@ -141,7 +142,8 @@ docker compose down -v && docker compose up -d
 |---|---|---|
 | `GET /api/v1/users/session/` | Public | Check auth state |
 | `POST /api/v1/users/logout/` | Required | Logout |
-| `GET /api/v1/devices/` | Required | List user's devices |
+| `GET /api/v1/devices/` | Required | List user's devices (includes telemetry logs) |
+| `POST /api/v1/devices/{device_code}/telemetry/` | OAuth2 Bearer | Ingest device telemetry event |
 | `POST /api/v1/invites/validate/` | Public | Validate invite code |
 | `POST /api/v1/invites/` | Admin | Create invite |
 | `GET /api/v1/invites/` | Required | List invites |

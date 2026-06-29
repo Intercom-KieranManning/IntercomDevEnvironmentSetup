@@ -1,0 +1,33 @@
+#!/bin/bash
+
+set -e
+
+REPOS=("." "APIServer" "ClientPython" "Frontend")
+NAMES=("Intercom (root)" "APIServer" "ClientPython" "Frontend")
+
+BOLD="\033[1m"
+CYAN="\033[36m"
+RED="\033[31m"
+RESET="\033[0m"
+
+if [ $# -eq 0 ]; then
+  echo "Usage: $0 <git command> [args...]"
+  echo "Example: $0 status"
+  echo "         $0 push"
+  echo "         $0 commit -m \"message\""
+  exit 1
+fi
+
+for i in "${!REPOS[@]}"; do
+  repo="${REPOS[$i]}"
+  name="${NAMES[$i]}"
+
+  if [ ! -d "$repo/.git" ]; then
+    echo -e "${RED}=== $name — skipped (not a git repo) ===${RESET}"
+    continue
+  fi
+
+  echo -e "${BOLD}${CYAN}=== $name ===${RESET}"
+  git -C "$repo" "$@"
+  echo
+done
