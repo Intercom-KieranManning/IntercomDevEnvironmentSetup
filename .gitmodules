@@ -1,9 +1,0 @@
-[submodule "APIServer"]
-	path = APIServer
-	url = git@github.com:kieranmanning/IntercomAPIServer.git
-[submodule "ClientPython"]
-	path = ClientPython
-	url = git@github.com:Intercom-KieranManning/IntercomClientPython.git
-[submodule "Frontend"]
-	path = Frontend
-	url = git@github.com:Intercom-KieranManning/IntercomFrontend.git
