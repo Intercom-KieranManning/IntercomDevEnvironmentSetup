@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -e
-
 REPOS=("." "APIServer" "ClientPython" "Frontend")
 NAMES=("Intercom (root)" "APIServer" "ClientPython" "Frontend")
 
@@ -9,6 +7,8 @@ BOLD="\033[1m"
 CYAN="\033[36m"
 RED="\033[31m"
 RESET="\033[0m"
+
+overall=0
 
 if [ $# -eq 0 ]; then
   echo "Usage: $0 <git command> [args...]"
@@ -28,6 +28,8 @@ for i in "${!REPOS[@]}"; do
   fi
 
   echo -e "${BOLD}${CYAN}=== $name ===${RESET}"
-  git -C "$repo" "$@"
+  git -C "$repo" "$@" || overall=$?
   echo
 done
+
+exit $overall
