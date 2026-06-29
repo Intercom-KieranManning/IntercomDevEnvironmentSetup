@@ -4,6 +4,8 @@ networks:
 
 volumes:
   pgdata:
+  client_tokens:
+  device_oauth_config:
 
 services:
   postgres_db:
@@ -46,6 +48,30 @@ services:
       timeout: 5s
       retries: 10
 
+  utility:
+    build:
+      context: ./APIServer
+      dockerfile: Dockerfile.dev
+    command: ["sh", "utility.sh"]
+    env_file:
+      - .env
+    environment:
+      - AWS_ACCESS_KEY_ID=${aws_access_key_id}
+      - AWS_SECRET_ACCESS_KEY=${aws_secret_access_key}
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - device_oauth_config:/root/.config/intercom-api
+      - client_tokens:/root/.config/intercomclient
+    networks:
+      - transparenc
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/utility-ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
   frontend:
     build:
       context: ./Frontend
@@ -55,5 +81,25 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    networks:
+      - transparenc
+
+  clientpython:
+    build:
+      context: ./ClientPython
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .env
+    environment:
+      - HTTP_API_BASE_URL=http://backend:8000
+      - WEBSOCKET_API_BASE_URL=ws://backend:8000
+    depends_on:
+      utility:
+        condition: service_healthy
+    devices:
+      - /dev/video0:/dev/video0
+    volumes:
+      - client_tokens:/root/.config/intercomclient
+      - device_oauth_config:/root/.config/intercom-api
     networks:
       - transparenc
