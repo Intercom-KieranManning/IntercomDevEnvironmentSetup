@@ -78,6 +78,8 @@ services:
       dockerfile: Dockerfile.dev
     ports:
       - "8080:8080"
+    environment:
+      - VITE_APP_VERSION=${APP_VERSION:-0.0.0-dev}
     depends_on:
       backend:
         condition: service_healthy

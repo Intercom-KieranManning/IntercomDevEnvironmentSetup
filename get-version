@@ -1,0 +1,21 @@
+#!/bin/bash
+# Derives a version from git tags and commit history.
+#
+# At a tag:           1.2.3
+# Ahead of last tag:  1.2.3+alpha-<branch>-<n>
+# No tags yet:        0.0.0+alpha-<branch>-<n>
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null | sed 's/[/_]/-/g')
+TAG=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
+
+if [ -z "$TAG" ]; then
+  COMMITS=$(git rev-list HEAD --count 2>/dev/null || echo "0")
+  echo "0.0.0+alpha-${BRANCH}-${COMMITS}"
+else
+  COMMITS=$(git rev-list "${TAG}..HEAD" --count 2>/dev/null || echo "0")
+  if [ "$COMMITS" -eq "0" ]; then
+    echo "$TAG"
+  else
+    echo "${TAG}+alpha-${BRANCH}-${COMMITS}"
+  fi
+fi
