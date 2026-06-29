@@ -18,6 +18,19 @@ if [ $# -eq 0 ]; then
   exit 1
 fi
 
+# Stamp the shared version into each sub-repo before committing so CI can read it
+if [ "$1" = "commit" ]; then
+  VERSION=$(get-version)
+  echo -e "${BOLD}Stamping VERSION=${VERSION} into sub-repos${RESET}"
+  for repo in "APIServer" "ClientPython" "Frontend"; do
+    if [ -d "$repo/.git" ]; then
+      echo "$VERSION" > "$repo/VERSION"
+      git -C "$repo" add VERSION
+    fi
+  done
+  echo
+fi
+
 for i in "${!REPOS[@]}"; do
   repo="${REPOS[$i]}"
   name="${NAMES[$i]}"
