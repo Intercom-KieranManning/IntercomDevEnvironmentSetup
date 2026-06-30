@@ -38,6 +38,7 @@ services:
       - AWS_ACCESS_KEY_ID=${aws_access_key_id}
       - AWS_SECRET_ACCESS_KEY=${aws_secret_access_key}
       - DJANGO_DEBUG=True
+      - HONEYCOMB_API_KEY=${HONEYCOMB_API_KEY}
     depends_on:
       postgres_db:
         condition: service_healthy
@@ -81,6 +82,7 @@ services:
       - "8080:8080"
     environment:
       - VITE_APP_VERSION=${APP_VERSION:-0.0.0-dev}
+      - VITE_HONEYCOMB_API_KEY=${VITE_HONEYCOMB_API_KEY}
     depends_on:
       backend:
         condition: service_healthy
@@ -96,6 +98,7 @@ services:
     environment:
       - HTTP_API_BASE_URL=http://backend:8000
       - WEBSOCKET_API_BASE_URL=ws://backend:8000
+      - HONEYCOMB_API_KEY=${HONEYCOMB_API_KEY}
     depends_on:
       utility:
         condition: service_healthy
