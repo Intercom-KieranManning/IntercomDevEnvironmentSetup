@@ -13,9 +13,7 @@ secrets.json
 APIServer/
 ClientPython/
 Frontend/
-iOSApp/
-ReactNativeClients/
-SwiftClient/
+ClientiOS
 
 # Local Python
 .venv/
