@@ -173,6 +173,7 @@ both intentionally deferred follow-ups.
 | `GET /api/v1/shareable-links/{token}/` | Public | Validate a share link (used by anonymous viewers) |
 | `GET /api/v1/notifications/` | Required | List the user's notifications (`?unread=true`) |
 | `POST /api/v1/notifications/{id}/read/` | Required | Mark a notification read |
+| `POST /api/v1/notifications/mark-all-read/` | Required | Mark all notifications read |
 | `POST /api/v1/invites/validate/` | Public | Validate invite code |
 | `POST /api/v1/invites/` | Admin | Create invite |
 | `GET /api/v1/invites/` | Required | List invites |
@@ -181,7 +182,7 @@ both intentionally deferred follow-ups.
 | `POST /oauth/token/` | Public | Poll for tokens |
 | `GET /api/v1/docs/` | — | Swagger UI |
 | `GET /api/v1/schema/` | — | OpenAPI spec |
-| `WS /ws/live_stream/<device_id>/` | Token/Session | WebRTC signaling |
+| `WS /ws/live_stream/<device_id>/` | Token/Session/`?share_token=` | WebRTC signaling + `display_message` |
 
 ## Django Management Commands
 
