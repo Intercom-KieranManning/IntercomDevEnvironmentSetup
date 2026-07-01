@@ -149,6 +149,16 @@ used by `ClientiOS` when mounted front-camera-out as a doorbell. Anonymous share
 are rejected server-side (`live_stream/consumers.py`'s `receive()` checks `scope["share_viewer"]`)
 so guests can look but not control the device's display.
 
+### Notifications
+`notifications.Notification` (backend) is the storage/API foundation for user-facing alerts —
+separate from `client_devices.DeviceTelemetryLog`, which is a raw per-device event log that isn't
+inherently user-facing. `notifications.services.create_notification(...)` is the single entry
+point other code should call to create one (e.g. a future motion-detection feature would call
+this, rather than constructing `Notification` objects directly). Currently backend-only
+(model + REST list/mark-read endpoints, no live delivery channel or push notifications yet) —
+real-time delivery to an open browser tab and push notifications for when nobody's looking are
+both intentionally deferred follow-ups.
+
 ## Key API Endpoints
 
 | Endpoint | Auth | Description |
@@ -161,6 +171,8 @@ so guests can look but not control the device's display.
 | `GET /api/v1/devices/oauth-app/` | Required | Get the device OAuth app's client_id (used to build the iOS setup QR code) |
 | `POST /api/v1/shareable-links/` | Required | Create an anonymous share link for a device |
 | `GET /api/v1/shareable-links/{token}/` | Public | Validate a share link (used by anonymous viewers) |
+| `GET /api/v1/notifications/` | Required | List the user's notifications (`?unread=true`) |
+| `POST /api/v1/notifications/{id}/read/` | Required | Mark a notification read |
 | `POST /api/v1/invites/validate/` | Public | Validate invite code |
 | `POST /api/v1/invites/` | Admin | Create invite |
 | `GET /api/v1/invites/` | Required | List invites |
