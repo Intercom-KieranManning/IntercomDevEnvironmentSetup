@@ -1,7 +1,7 @@
 #!/bin/bash
 
-REPOS=("." "APIServer" "ClientPython" "Frontend")
-NAMES=("Intercom (root)" "APIServer" "ClientPython" "Frontend")
+REPOS=("." "APIServer" "ClientPython" "Frontend" "ClientiOS")
+NAMES=("Intercom (root)" "APIServer" "ClientPython" "Frontend" "ClientiOS")
 
 BOLD="\033[1m"
 CYAN="\033[36m"
