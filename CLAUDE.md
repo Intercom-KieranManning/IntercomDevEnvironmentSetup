@@ -1,6 +1,6 @@
 # Intercom — Project Overview
 
-Full-stack video intercom system. Django REST API backend + React frontend + Python device client with WebRTC streaming.
+Full-stack video intercom system. Django REST API backend + React frontend + Python and iOS device clients with WebRTC streaming.
 
 ## Repository Structure
 
@@ -33,6 +33,11 @@ Intercom/
 │   ├── intercomclient/          # Config, auth, camera, token store, telemetry
 │   ├── pyproject.toml           # uv dependencies (aiortc, opencv, websockets)
 │   └── Dockerfile.dev           # Dev image (uv + bookworm-slim + OpenCV deps)
+├── ClientiOS/                    # Swift/SwiftUI iOS device client (camera + WebRTC)
+│   ├── Sources/ClientiOSCore/    # Portable Foundation logic — builds/tests on Linux
+│   ├── Sources/ClientiOS/        # App target — SwiftUI, WebRTC, Keychain (Apple-only)
+│   ├── Package.swift / xtool.yml # Built via xtool (github.com/xtool-org/xtool), not Xcode
+│   └── README.md / CLAUDE.md     # Setup, architecture, verified-vs-unverified notes
 ├── docker-compose.yml           # Root orchestration (all services)
 ├── .env                         # Environment variables (root level)
 └── .envrc                       # Direnv config (loads .env)
@@ -47,7 +52,8 @@ Intercom/
 | **Auth** | AWS Cognito OAuth2, django-oauth-toolkit (RFC 8628 device flow), PyJWT |
 | **ASGI** | Daphne (HTTP + WebSockets via Django Channels) |
 | **Frontend** | React 19, TypeScript, Vite 6, Material-UI 9, React Router 7 |
-| **Device Client** | Python 3.14+, aiortc (WebRTC), OpenCV, websockets |
+| **Device Client (Pi)** | Python 3.14+, aiortc (WebRTC), OpenCV, websockets |
+| **Device Client (iOS)** | Swift 6, SwiftUI, stasel/WebRTC, built via xtool (no Xcode/macOS required) |
 | **Package Mgmt** | uv (Python), npm (frontend) |
 | **DevOps** | Docker Compose, GitHub Actions CI/CD |
 | **Code Quality** | Ruff, MyPy, ESLint, pre-commit hooks, Conventional Commits |
@@ -127,14 +133,21 @@ docker compose down -v && docker compose up -d
 
 ## WebRTC Streaming Flow
 
-1. **Device client** connects to `/ws/live_stream/<device_id>/` with Bearer token
-2. **Viewer (React)** connects to same WebSocket via session auth
+1. **Device client** (`ClientPython` or `ClientiOS` — same protocol either way) connects to `/ws/live_stream/<device_id>/` with Bearer token
+2. **Viewer (React)** connects to same WebSocket via session auth (or `?share_token=` for anonymous shareable-link viewers, see `shareable_links` app)
 3. Viewer creates RTCPeerConnection with `recvonly` video transceiver
 4. Viewer sends SDP offer → device receives it
-5. Device captures camera frames via OpenCV → adds track → sends SDP answer
+5. Device captures camera frames → adds track → sends SDP answer
 6. ICE candidates exchanged bidirectionally via signaling server
 7. Video stream flows device → peer connection → viewer `<video>` element
 8. On viewer disconnect, device resets RTCPeerConnection (keeps signaling WS open) ready for the next viewer
+
+### On-screen display message (doorbell mode)
+A `display_message` signaling message (viewer → device only) lets a session-authenticated viewer
+remotely set/clear a message shown on the device's own screen (e.g. "We're not home right now") —
+used by `ClientiOS` when mounted front-camera-out as a doorbell. Anonymous shareable-link viewers
+are rejected server-side (`live_stream/consumers.py`'s `receive()` checks `scope["share_viewer"]`)
+so guests can look but not control the device's display.
 
 ## Key API Endpoints
 
@@ -143,7 +156,11 @@ docker compose down -v && docker compose up -d
 | `GET /api/v1/users/session/` | Public | Check auth state |
 | `POST /api/v1/users/logout/` | Required | Logout |
 | `GET /api/v1/devices/` | Required | List user's devices (includes telemetry logs) |
+| `DELETE /api/v1/devices/{id}/` | Required | Delete a device owned by the user (cascades telemetry logs) |
 | `POST /api/v1/devices/{device_code}/telemetry/` | OAuth2 Bearer | Ingest device telemetry event |
+| `GET /api/v1/devices/oauth-app/` | Required | Get the device OAuth app's client_id (used to build the iOS setup QR code) |
+| `POST /api/v1/shareable-links/` | Required | Create an anonymous share link for a device |
+| `GET /api/v1/shareable-links/{token}/` | Public | Validate a share link (used by anonymous viewers) |
 | `POST /api/v1/invites/validate/` | Public | Validate invite code |
 | `POST /api/v1/invites/` | Admin | Create invite |
 | `GET /api/v1/invites/` | Required | List invites |
